@@ -1,0 +1,58 @@
+name: Security checks
+
+# A consumer holding ZERO framework files. Everything security-related is
+# fetched from the framework at @v1 by the reusable workflow itself.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-security:
+    uses: IamRitz/ssd-security-framework/.github/workflows/_source-security.yml@v1
+    permissions:
+      contents: read
+      pull-requests: write
+    with:
+      toolkit_ref: v1
+      gate_mode: enforce
+      semgrep_configs: |
+        p/owasp-top-ten
+        p/javascript
+      semgrep_paths: src
+
+  security-gate:
+    name: security-gate
+    needs: source-security
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report the source security verdict
+        env:
+          RESULT: ${{ needs.source-security.result }}
+          VERDICT: ${{ needs.source-security.outputs.verdict }}
+          TRUSTED: ${{ needs.source-security.outputs.integrity_trusted }}
+        run: |
+          echo "verdict=${VERDICT:-unknown} trusted=${TRUSTED:-unknown} result=$RESULT"
+          [ "$RESULT" = "success" ] || exit 1
+
+  conformance:
+    needs: source-security
+    if: ${{ always() }}
+    uses: IamRitz/ssd-security-framework/.github/workflows/_conformance.yml@v1
+    with:
+      toolkit_ref: v1
+      artifact_type: none
+      registry: none
+      deploy_target: none
+      break_glass_enabled: false
+      observed: >-
+        {"secret-scan":{"status":"${{ needs.source-security.result }}"},
+         "dependency-scan":{"status":"${{ needs.source-security.result }}"},
+         "sast":{"status":"${{ needs.source-security.result }}"},
+         "source-gate":{"status":"${{ needs.source-security.result }}"}}
