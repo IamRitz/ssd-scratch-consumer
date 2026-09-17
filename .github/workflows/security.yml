@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   source-security:
-    uses: IamRitz/ssd-security-framework/.github/workflows/_source-security.yml@56c575b7f7f2055a8ac88e6625746e58efeb7355
+    uses: IamRitz/ssd-security-framework/.github/workflows/_source-security.yml@fdd77b90e4f189aec56107afb5e5af536c47fbe1
 
     permissions:
       contents: read
@@ -23,7 +23,7 @@ jobs:
       id-token: write
 
     with:
-      toolkit_ref: 56c575b7f7f2055a8ac88e6625746e58efeb7355
+      toolkit_ref: fdd77b90e4f189aec56107afb5e5af536c47fbe1
 
       # First onboarding run only.
       gate_mode: enforce
@@ -54,8 +54,21 @@ jobs:
 
           echo "source-security: result=$RESULT verdict=${VERDICT:-unknown} trusted=${TRUSTED:-unknown}"
 
+
           if [ "$MODE" = "log-only" ]; then
-            echo "::warning::GREEN BY CONFIGURATION, not by verdict — gate_mode is log-only."
+            # Verdict-specific: only a BLOCK is suppressed by log-only. A PASS has
+            # nothing to suppress, but log-only stays visible as a rollout mode.
+            case "$VERDICT" in
+              BLOCK)
+                echo "::warning::GREEN BY CONFIGURATION, not by verdict — source verdict BLOCK is reported but NOT enforced because gate_mode is log-only."
+                ;;
+              PASS|PASS-WITH-EXCEPTIONS)
+                echo "::warning::Source verdict $VERDICT. gate_mode is log-only; no blocking verdict exists, so nothing was suppressed. A future BLOCK would not fail this check until the repository moves to enforce."
+                ;;
+              *)
+                echo "::warning::Source verdict is unavailable ('${VERDICT}'), and gate_mode is log-only so nothing is enforced. Treat this run as UNKNOWN, not clean."
+                ;;
+            esac
           fi
 
           [ "$RESULT" = "success" ] || exit 1
@@ -64,10 +77,10 @@ jobs:
     needs: source-security
     if: ${{ always() }}
 
-    uses: IamRitz/ssd-security-framework/.github/workflows/_conformance.yml@56c575b7f7f2055a8ac88e6625746e58efeb7355
+    uses: IamRitz/ssd-security-framework/.github/workflows/_conformance.yml@fdd77b90e4f189aec56107afb5e5af536c47fbe1
 
     with:
-      toolkit_ref: 56c575b7f7f2055a8ac88e6625746e58efeb7355
+      toolkit_ref: fdd77b90e4f189aec56107afb5e5af536c47fbe1
 
       phase: pr
 
@@ -77,7 +90,7 @@ jobs:
       break_glass_enabled: false
 
       observed: >-
-        {"secret-scan":{"status":"${{ needs.source-security.result }}","evidence":"source-security job"},
-         "dependency-scan":{"status":"${{ needs.source-security.result }}","evidence":"source-security job"},
-         "sast":{"status":"${{ needs.source-security.result }}","evidence":"source-security job"},
-         "source-gate":{"status":"${{ needs.source-security.result }}","evidence":"security-gate check"}}
+        {"secret-scan":{"status":"${{ needs.source-security.outputs.secret_scan_result }}","evidence":"Secret scanning job (per-control output)"},
+         "dependency-scan":{"status":"${{ needs.source-security.outputs.dependency_scan_result }}","evidence":"Dependency scanning job (per-control output)"},
+         "sast":{"status":"${{ needs.source-security.outputs.sast_result }}","evidence":"SAST job (per-control output)"},
+         "source-gate":{"status":"${{ needs.source-security.outputs.source_gate_result }}","verdict":"${{ needs.source-security.outputs.verdict }}","gate_mode":"${{ needs.source-security.outputs.gate_mode }}","integrity_trusted":"${{ needs.source-security.outputs.integrity_trusted }}","evidence":"source-gate job"}}
