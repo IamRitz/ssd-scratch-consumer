@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "semgrep 1.176.0",
+  "rulesets": [
+    "p/owasp-top-ten",
+    "p/javascript",
+    "security/semgrep/lab-rules.yml"
+  ],
+  "findings": [
+    {
+      "fingerprint": "45809298e3ba059964166ad81230f679c30f2559d7fbfab5b4cee0973f14a1a5",
+      "checkId": "security.semgrep.lab-dangerous-eval",
+      "path": "src/lab-vulns.js"
+    }
+  ]
+}

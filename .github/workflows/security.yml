@@ -22,7 +22,6 @@ jobs:
     with:
       toolkit_ref: 56c575b7f7f2055a8ac88e6625746e58efeb7355 
       gate_mode: log-only
-      bootstrap_baseline: true
       semgrep_configs: |
         p/owasp-top-ten
         p/javascript
