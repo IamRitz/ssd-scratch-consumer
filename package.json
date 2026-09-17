@@ -1,7 +1,0 @@
-{
-  "name": "ssd-scratch-consumer",
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
-  "description": "Throwaway consumer proving a repo with zero framework files can run the shared security pipeline."
-}

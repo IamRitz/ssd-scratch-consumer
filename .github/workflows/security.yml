@@ -1,12 +1,13 @@
 name: Security checks
 
-# A consumer holding ZERO framework files. Everything security-related is
-# fetched from the framework at @v1 by the reusable workflow itself.
 on:
   pull_request:
-    branches: [main]
-  push:
-    branches: [main]
+    branches:
+      - main
+
+  schedule:
+    - cron: '0 6 * * 1'
+
   workflow_dispatch:
 
 permissions:
@@ -14,46 +15,69 @@ permissions:
 
 jobs:
   source-security:
-    uses: IamRitz/ssd-security-framework/.github/workflows/_source-security.yml@5db743b14abdc51edfb2adc91f6b2e228b3ad05d
+    uses: IamRitz/ssd-security-framework/.github/workflows/_source-security.yml@56c575b7f7f2055a8ac88e6625746e58efeb7355
+
     permissions:
       contents: read
       pull-requests: write
-      id-token: write
+
     with:
-      toolkit_ref: 5db743b14abdc51edfb2adc91f6b2e228b3ad05d
-      gate_mode: enforce
+      toolkit_ref: 56c575b7f7f2055a8ac88e6625746e58efeb7355
+
+      # First onboarding run only.
+      gate_mode: log-only
+      bootstrap_baseline: true
+
       semgrep_configs: |
         p/owasp-top-ten
-        p/javascript
+        p/python
+
       semgrep_paths: src
 
   security-gate:
     name: security-gate
     needs: source-security
     if: ${{ always() }}
+
     runs-on: ubuntu-latest
+
     steps:
-      - name: Report the source security verdict
+      - name: Require source security
         env:
           RESULT: ${{ needs.source-security.result }}
           VERDICT: ${{ needs.source-security.outputs.verdict }}
+          MODE: ${{ needs.source-security.outputs.gate_mode }}
           TRUSTED: ${{ needs.source-security.outputs.integrity_trusted }}
+
         run: |
-          echo "verdict=${VERDICT:-unknown} trusted=${TRUSTED:-unknown} result=$RESULT"
+          set -euo pipefail
+
+          echo "source-security: result=$RESULT verdict=${VERDICT:-unknown} trusted=${TRUSTED:-unknown}"
+
+          if [ "$MODE" = "log-only" ]; then
+            echo "::warning::GREEN BY CONFIGURATION, not by verdict — gate_mode is log-only."
+          fi
+
           [ "$RESULT" = "success" ] || exit 1
 
   conformance:
     needs: source-security
     if: ${{ always() }}
-    uses: IamRitz/ssd-security-framework/.github/workflows/_conformance.yml@5db743b14abdc51edfb2adc91f6b2e228b3ad05d
+
+    uses: IamRitz/ssd-security-framework/.github/workflows/_conformance.yml@56c575b7f7f2055a8ac88e6625746e58efeb7355
+
     with:
-      toolkit_ref: 5db743b14abdc51edfb2adc91f6b2e228b3ad05d
-      artifact_type: none
+      toolkit_ref: 56c575b7f7f2055a8ac88e6625746e58efeb7355
+
+      phase: pr
+
+      artifact_type: library
       registry: none
       deploy_target: none
       break_glass_enabled: false
+
       observed: >-
-        {"secret-scan":{"status":"${{ needs.source-security.result }}"},
-         "dependency-scan":{"status":"${{ needs.source-security.result }}"},
-         "sast":{"status":"${{ needs.source-security.result }}"},
-         "source-gate":{"status":"${{ needs.source-security.result }}"}}
+        {"secret-scan":{"status":"${{ needs.source-security.result }}","evidence":"source-security job"},
+         "dependency-scan":{"status":"${{ needs.source-security.result }}","evidence":"source-security job"},
+         "sast":{"status":"${{ needs.source-security.result }}","evidence":"source-security job"},
+         "source-gate":{"status":"${{ needs.source-security.result }}","evidence":"security-gate check"}}
