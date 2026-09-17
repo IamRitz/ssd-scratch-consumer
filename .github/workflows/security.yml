@@ -21,8 +21,7 @@ jobs:
       id-token: write
     with:
       toolkit_ref: 5db743b14abdc51edfb2adc91f6b2e228b3ad05d
-      gate_mode: log-only
-      bootstrap_baseline: true
+      gate_mode: enforce
       semgrep_configs: |
         p/owasp-top-ten
         p/javascript
