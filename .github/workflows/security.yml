@@ -26,8 +26,7 @@ jobs:
       toolkit_ref: 56c575b7f7f2055a8ac88e6625746e58efeb7355
 
       # First onboarding run only.
-      gate_mode: log-only
-      bootstrap_baseline: true
+      gate_mode: enforce
 
       semgrep_configs: |
         p/owasp-top-ten
