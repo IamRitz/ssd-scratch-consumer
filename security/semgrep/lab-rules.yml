@@ -1,0 +1,7 @@
+rules:
+  - id: lab-dangerous-eval
+    message: "Lab: use of dynamic eval()"
+    severity: ERROR
+    languages:
+      - javascript
+    pattern: eval($X)

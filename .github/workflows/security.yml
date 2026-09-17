@@ -25,6 +25,7 @@ jobs:
       semgrep_configs: |
         p/owasp-top-ten
         p/javascript
+        security/semgrep/lab-rules.yml
       semgrep_paths: src
 
   security-gate:
