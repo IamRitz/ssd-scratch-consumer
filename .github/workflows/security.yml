@@ -20,6 +20,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      id-token: write
 
     with:
       toolkit_ref: 56c575b7f7f2055a8ac88e6625746e58efeb7355
