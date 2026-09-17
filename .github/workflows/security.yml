@@ -14,13 +14,13 @@ permissions:
 
 jobs:
   source-security:
-    uses: IamRitz/ssd-security-framework/.github/workflows/_source-security.yml@5db743b14abdc51edfb2adc91f6b2e228b3ad05d
+    uses: IamRitz/ssd-security-framework/.github/workflows/_source-security.yml@56c575b7f7f2055a8ac88e6625746e58efeb7355
     permissions:
       contents: read
       pull-requests: write
       id-token: write
     with:
-      toolkit_ref: 5db743b14abdc51edfb2adc91f6b2e228b3ad05d
+      toolkit_ref: 56c575b7f7f2055a8ac88e6625746e58efeb7355 
       gate_mode: enforce
       semgrep_configs: |
         p/owasp-top-ten
@@ -46,9 +46,9 @@ jobs:
   conformance:
     needs: source-security
     if: ${{ always() }}
-    uses: IamRitz/ssd-security-framework/.github/workflows/_conformance.yml@5db743b14abdc51edfb2adc91f6b2e228b3ad05d
+    uses: IamRitz/ssd-security-framework/.github/workflows/_conformance.yml@56c575b7f7f2055a8ac88e6625746e58efeb7355
     with:
-      toolkit_ref: 5db743b14abdc51edfb2adc91f6b2e228b3ad05d
+      toolkit_ref: 56c575b7f7f2055a8ac88e6625746e58efeb7355 
       artifact_type: none
       registry: none
       deploy_target: none
