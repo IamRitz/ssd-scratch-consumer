@@ -1,0 +1,6 @@
+title = "Scratch security test config"
+
+[[rules]]
+id = "scratch-python-test-secret"
+description = "Synthetic secret fixture for pipeline validation"
+regex = '''SSD_TEST_SECRET_[A-Za-z0-9]{24}'''

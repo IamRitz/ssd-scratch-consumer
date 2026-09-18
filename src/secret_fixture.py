@@ -1,0 +1,1 @@
+TEST_SECRET = "SSD_TEST_SECRET_0123456789abcdefghijklmn"
