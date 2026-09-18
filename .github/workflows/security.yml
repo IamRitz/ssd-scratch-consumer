@@ -34,8 +34,6 @@ jobs:
 
       semgrep_paths: src
 
-      trufflehog_exclude_paths: .trufflehog_exclude_paths.txt
-
   security-gate:
     name: security-gate
     needs: source-security
