@@ -15,15 +15,14 @@ permissions:
 
 jobs:
   source-security:
-    uses: IamRitz/ssd-security-framework/.github/workflows/_source-security.yml@068303774554f189b7444a0d3c95c6aeb7798608
-
+    uses: IamRitz/ssd-security-framework/.github/workflows/_source-security.yml@70421b4702ba3d470f13d661723f4ee8cbf7f489
     permissions:
       contents: read
       pull-requests: write
       id-token: write
 
     with:
-      toolkit_ref: 068303774554f189b7444a0d3c95c6aeb7798608
+      toolkit_ref: 70421b4702ba3d470f13d661723f4ee8cbf7f489
 
       # First onboarding run only.
       gate_mode: enforce
@@ -73,14 +72,15 @@ jobs:
     needs: container-build
     if: github.event_name != 'schedule'
 
-    uses: IamRitz/ssd-security-framework/.github/workflows/_image-scan-prepush.yml@068303774554f189b7444a0d3c95c6aeb7798608
+    uses: IamRitz/ssd-security-framework/.github/workflows/_image-scan-prepush.yml@70421b4702ba3d470f13d661723f4ee8cbf7f489
 
     permissions:
       contents: read
       pull-requests: write
 
     with:
-      toolkit_ref: 068303774554f189b7444a0d3c95c6aeb7798608
+      toolkit_ref: 70421b4702ba3d470f13d661723f4ee8cbf7f489
+
       image_artifact: application-image-${{ github.sha }}
       gate_mode: enforce
 
@@ -175,10 +175,10 @@ jobs:
 
     if: ${{ always() && github.event_name != 'schedule' }}
 
-    uses: IamRitz/ssd-security-framework/.github/workflows/_conformance.yml@068303774554f189b7444a0d3c95c6aeb7798608
-
+    uses: IamRitz/ssd-security-framework/.github/workflows/_conformance.yml@70421b4702ba3d470f13d661723f4ee8cbf7f489
+    
     with:
-      toolkit_ref: 068303774554f189b7444a0d3c95c6aeb7798608
+      toolkit_ref: 70421b4702ba3d470f13d661723f4ee8cbf7f489
 
       phase: pr
 
