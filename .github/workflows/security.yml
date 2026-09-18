@@ -15,7 +15,8 @@ permissions:
 
 jobs:
   source-security:
-    uses: IamRitz/ssd-security-framework/.github/workflows/_source-security.yml@068303774554f189b7444a0d3c95c6aeb7798608
+    # uses: IamRitz/ssd-security-framework/.github/workflows/_source-security.yml@068303774554f189b7444a0d3c95c6aeb7798608
+    uses: IamRitz/ssd-security-framework/.github/workflows/_source-security.yml@5a6401af8ba6a362e92ffc800144ebf8bdde8c02
 
     permissions:
       contents: read
@@ -23,7 +24,8 @@ jobs:
       id-token: write
 
     with:
-      toolkit_ref: 068303774554f189b7444a0d3c95c6aeb7798608
+      # toolkit_ref: 068303774554f189b7444a0d3c95c6aeb7798608
+      toolkit_ref: 5a6401af8ba6a362e92ffc800144ebf8bdde8c02
 
       # First onboarding run only.
       gate_mode: enforce
@@ -77,10 +79,10 @@ jobs:
     needs: source-security
     if: ${{ always() }}
 
-    uses: IamRitz/ssd-security-framework/.github/workflows/_conformance.yml@068303774554f189b7444a0d3c95c6aeb7798608
-
+    # uses: IamRitz/ssd-security-framework/.github/workflows/_conformance.yml@068303774554f189b7444a0d3c95c6aeb7798608
+    uses: IamRitz/ssd-security-framework/.github/workflows/_conformance.yml@5a6401af8ba6a362e92ffc800144ebf8bdde8c02
     with:
-      toolkit_ref: 068303774554f189b7444a0d3c95c6aeb7798608
+      toolkit_ref: 5a6401af8ba6a362e92ffc800144ebf8bdde8c02
 
       phase: pr
 
