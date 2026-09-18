@@ -34,62 +34,186 @@ jobs:
 
       semgrep_paths: src
 
+  container-build:
+    name: Container build
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
+
+      - name: Build image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
+        with:
+          context: .
+          load: true
+          tags: scratch-python:${{ github.sha }}
+
+      - name: Export image
+        run: docker save -o application-image.tar "scratch-python:$GITHUB_SHA"
+
+      - name: Upload image
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: application-image-${{ github.sha }}
+          path: application-image.tar
+          if-no-files-found: error
+          retention-days: 1
+
+  image-security:
+    needs: container-build
+    if: github.event_name != 'schedule'
+
+    uses: IamRitz/ssd-security-framework/.github/workflows/_image-scan-prepush.yml@068303774554f189b7444a0d3c95c6aeb7798608
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    with:
+      toolkit_ref: 068303774554f189b7444a0d3c95c6aeb7798608
+      image_artifact: application-image-${{ github.sha }}
+      gate_mode: enforce
+
   security-gate:
     name: security-gate
-    needs: source-security
+    needs: 
+      - source-security
+      - image-security
     if: ${{ always() }}
 
     runs-on: ubuntu-latest
 
     steps:
-      - name: Require source security
+      - name: Require source and image security
         env:
-          RESULT: ${{ needs.source-security.result }}
-          VERDICT: ${{ needs.source-security.outputs.verdict }}
-          MODE: ${{ needs.source-security.outputs.gate_mode }}
-          TRUSTED: ${{ needs.source-security.outputs.integrity_trusted }}
+          EVENT: ${{ github.event_name }}
+
+          SOURCE_RESULT: ${{ needs.source-security.result }}
+          SOURCE_VERDICT: ${{ needs.source-security.outputs.verdict }}
+          SOURCE_MODE: ${{ needs.source-security.outputs.gate_mode }}
+          SOURCE_TRUSTED: ${{ needs.source-security.outputs.integrity_trusted }}
+
+          IMAGE_RESULT: ${{ needs.image-security.result }}
+          IMAGE_VERDICT: ${{ needs.image-security.outputs.verdict }}
+          IMAGE_MODE: ${{ needs.image-security.outputs.gate_mode }}
+          IMAGE_TRUSTED: ${{ needs.image-security.outputs.integrity_trusted }}
 
         run: |
           set -euo pipefail
 
-          echo "source-security: result=$RESULT verdict=${VERDICT:-unknown} trusted=${TRUSTED:-unknown}"
+          echo "source-security: result=$SOURCE_RESULT verdict=${SOURCE_VERDICT:-unknown} trusted=${SOURCE_TRUSTED:-unknown}"
+          echo "image-security:  result=$IMAGE_RESULT verdict=${IMAGE_VERDICT:-unknown} trusted=${IMAGE_TRUSTED:-unknown}"
 
+          failed=0
 
-          if [ "$MODE" = "log-only" ]; then
-            # Verdict-specific: only a BLOCK is suppressed by log-only. A PASS has
-            # nothing to suppress, but log-only stays visible as a rollout mode.
-            case "$VERDICT" in
+          if [ "$SOURCE_RESULT" != "success" ]; then
+            echo "::error::source security did not pass (result=$SOURCE_RESULT)"
+            failed=1
+          fi
+
+          if [ "$EVENT" = "schedule" ]; then
+            case "$IMAGE_RESULT" in
+              success|skipped) ;;
+              *)
+                echo "::error::image security did not pass (result=$IMAGE_RESULT)"
+                failed=1
+                ;;
+            esac
+          elif [ "$IMAGE_RESULT" != "success" ]; then
+            echo "::error::image security did not pass (result=$IMAGE_RESULT)"
+            failed=1
+          fi
+
+          if [ "$SOURCE_MODE" = "log-only" ]; then
+            case "$SOURCE_VERDICT" in
               BLOCK)
                 echo "::warning::GREEN BY CONFIGURATION, not by verdict — source verdict BLOCK is reported but NOT enforced because gate_mode is log-only."
                 ;;
               PASS|PASS-WITH-EXCEPTIONS)
-                echo "::warning::Source verdict $VERDICT. gate_mode is log-only; no blocking verdict exists, so nothing was suppressed. A future BLOCK would not fail this check until the repository moves to enforce."
+                echo "::warning::Source verdict $SOURCE_VERDICT. gate_mode is log-only; nothing was suppressed."
                 ;;
               *)
-                echo "::warning::Source verdict is unavailable ('${VERDICT}'), and gate_mode is log-only so nothing is enforced. Treat this run as UNKNOWN, not clean."
+                echo "::warning::Source verdict unavailable; treat this run as UNKNOWN."
                 ;;
             esac
           fi
 
-          [ "$RESULT" = "success" ] || exit 1
+          if [ "$IMAGE_RESULT" != "skipped" ] && [ "$IMAGE_MODE" = "log-only" ]; then
+            case "$IMAGE_VERDICT" in
+              BLOCK_DEPLOY)
+                echo "::warning::GREEN BY CONFIGURATION, not by verdict — image verdict BLOCK_DEPLOY is reported but NOT enforced because gate_mode is log-only."
+                ;;
+              DEPLOY|DEPLOY-WITH-EXCEPTIONS)
+                echo "::warning::Image verdict $IMAGE_VERDICT. gate_mode is log-only; nothing was suppressed."
+                ;;
+              *)
+                echo "::warning::Image verdict unavailable; treat this run as UNKNOWN."
+                ;;
+            esac
+          fi
+
+          if [ "$failed" -ne 0 ]; then
+            exit 1
+          fi
+
+          echo "All required security controls passed."
 
   conformance:
-    needs: source-security
-    if: ${{ always() }}
+    needs:
+      - source-security
+      - image-security
+
+    if: ${{ always() && github.event_name != 'schedule' }}
 
     uses: IamRitz/ssd-security-framework/.github/workflows/_conformance.yml@068303774554f189b7444a0d3c95c6aeb7798608
+
     with:
       toolkit_ref: 068303774554f189b7444a0d3c95c6aeb7798608
 
       phase: pr
 
-      artifact_type: library
+      artifact_type: container
       registry: none
-      deploy_target: none
+      deploy_target: self-managed
       break_glass_enabled: false
 
       observed: >-
-        {"secret-scan":{"status":"${{ needs.source-security.outputs.secret_scan_result }}","evidence":"Secret scanning job (per-control output)"},
-         "dependency-scan":{"status":"${{ needs.source-security.outputs.dependency_scan_result }}","evidence":"Dependency scanning job (per-control output)"},
-         "sast":{"status":"${{ needs.source-security.outputs.sast_result }}","evidence":"SAST job (per-control output)"},
-         "source-gate":{"status":"${{ needs.source-security.outputs.source_gate_result }}","verdict":"${{ needs.source-security.outputs.verdict }}","gate_mode":"${{ needs.source-security.outputs.gate_mode }}","integrity_trusted":"${{ needs.source-security.outputs.integrity_trusted }}","evidence":"source-gate job"}}
+        {
+          "secret-scan":{
+            "status":"${{ needs.source-security.outputs.secret_scan_result }}",
+            "evidence":"Secret scanning job (per-control output)"
+          },
+          "dependency-scan":{
+            "status":"${{ needs.source-security.outputs.dependency_scan_result }}",
+            "evidence":"Dependency scanning job (per-control output)"
+          },
+          "sast":{
+            "status":"${{ needs.source-security.outputs.sast_result }}",
+            "evidence":"SAST job (per-control output)"
+          },
+          "source-gate":{
+            "status":"${{ needs.source-security.outputs.source_gate_result }}",
+            "verdict":"${{ needs.source-security.outputs.verdict }}",
+            "gate_mode":"${{ needs.source-security.outputs.gate_mode }}",
+            "integrity_trusted":"${{ needs.source-security.outputs.integrity_trusted }}",
+            "evidence":"source-gate job"
+          },
+          "image-scan-prepush":{
+            "status":"${{ needs.image-security.result }}",
+            "verdict":"${{ needs.image-security.outputs.verdict }}",
+            "gate_mode":"${{ needs.image-security.outputs.gate_mode }}",
+            "integrity_trusted":"${{ needs.image-security.outputs.integrity_trusted }}",
+            "evidence":"pre-push Trivy gate"
+          }
+        }
+
