@@ -1,3 +1,9 @@
 {
   "schemaVersion": 1,
-  "findings":
+  "generatedBy": "semgrep 1.176.0",
+  "rulesets": [
+    "p/owasp-top-ten",
+    "p/python"
+  ],
+  "findings": []
+}

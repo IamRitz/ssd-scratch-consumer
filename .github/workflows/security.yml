@@ -24,7 +24,6 @@ jobs:
     with:
       toolkit_ref: 3bae4435bb8fb582eb857654b5b3ccee51350905
 
-      # First onboarding run only.
       gate_mode: enforce
 
       semgrep_configs: |
@@ -36,15 +35,17 @@ jobs:
       break_glass_enabled: true
       break_glass_transport: lambda
 
+      # Fabricated eligible dependency BLOCK for this test only.
+      synthetic_block_fixture: dependency
+
   break-glass:
     needs:
       - source-security
 
-    # TEST PROBE:
-    # Deliberately force the break-glass workflow to inspect ANY BLOCK.
-    # Normal production wiring would use:
-    # needs.source-security.outputs.break_glass_delegated == 'true'
-    if: ${{ always() && needs.source-security.outputs.verdict == 'BLOCK' }}
+    # Normal production-shaped condition:
+    # only run when the source workflow actually delegates an eligible,
+    # trusted, enforced BLOCK.
+    if: ${{ always() && needs.source-security.outputs.break_glass_delegated == 'true' }}
 
     uses: IamRitz/ssd-security-framework/.github/workflows/_break-glass-lambda.yml@3bae4435bb8fb582eb857654b5b3ccee51350905
 
@@ -58,55 +59,99 @@ jobs:
       gate_mode: ${{ needs.source-security.outputs.gate_mode }}
       expected_gate_digest: ${{ needs.source-security.outputs.gate_digest }}
 
-      # Syntactically valid dummy production configuration.
-      # Preflight must reject the integrity BLOCK BEFORE these can be used.
+      # Production placeholders.
+      # These MUST differ from the synthetic pair so the framework can prove
+      # synthetic isolation. They are not expected to be invoked in this test.
       lambda_function: ssd-break-glass-prod-placeholder
-      lambda_role_arn: arn:aws:iam::111111111111:role/ssd-break-glass-prod-placeholder
+      lambda_role_arn: arn:aws:iam::157328692276:role/ssd-break-glass-prod-placeholder
       aws_region: us-east-1
+
+      # Real synthetic test resources.
+      synthetic_lambda_function: ssd-break-glass-synthetic
+      synthetic_lambda_role_arn: arn:aws:iam::157328692276:role/ssd-break-glass-synthetic-invoker
+      synthetic_aws_region: us-east-1
 
       timeout_seconds: '30'
 
   security-gate:
     name: security-gate
-    needs: source-security
+
+    needs:
+      - source-security
+      - break-glass
+
     if: ${{ always() }}
 
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+
+    outputs:
+      source_outcome: ${{ steps.gate.outputs.source_outcome }}
+      source_override: ${{ steps.gate.outputs.source_override }}
+
     steps:
-      - name: Require source security
+      - name: Check out the security framework toolkit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: IamRitz/ssd-security-framework
+          ref: 3bae4435bb8fb582eb857654b5b3ccee51350905
+          path: .ssd-toolkit
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24.21.0'
+          package-manager-cache: false
+
+      - name: Evaluate final source gate
+        id: gate
         env:
-          RESULT: ${{ needs.source-security.result }}
-          VERDICT: ${{ needs.source-security.outputs.verdict }}
-          MODE: ${{ needs.source-security.outputs.gate_mode }}
-          TRUSTED: ${{ needs.source-security.outputs.integrity_trusted }}
+          SSD_TOOLKIT: ${{ github.workspace }}/.ssd-toolkit/security
+
+          SOURCE_RESULT: ${{ needs.source-security.result }}
+          SOURCE_VERDICT: ${{ needs.source-security.outputs.verdict }}
+          SOURCE_GATE_MODE: ${{ needs.source-security.outputs.gate_mode }}
+          SOURCE_INTEGRITY_TRUSTED: ${{ needs.source-security.outputs.integrity_trusted }}
+          SOURCE_BREAK_GLASS_ELIGIBLE: ${{ needs.source-security.outputs.break_glass_eligible }}
+          SOURCE_BREAK_GLASS_DELEGATED: ${{ needs.source-security.outputs.break_glass_delegated }}
+
+          SOURCE_SECRET_SCAN_RESULT: ${{ needs.source-security.outputs.secret_scan_result }}
+          SOURCE_DEPENDENCY_SCAN_RESULT: ${{ needs.source-security.outputs.dependency_scan_result }}
+          SOURCE_SAST_RESULT: ${{ needs.source-security.outputs.sast_result }}
+
+          SOURCE_GATE_DIGEST: ${{ needs.source-security.outputs.gate_digest }}
+
+          BREAK_GLASS_RESULT: ${{ needs.break-glass.result }}
+          BREAK_GLASS_DECISION: ${{ needs.break-glass.outputs.decision_status }}
+          BREAK_GLASS_REQUEST_DELIVERED: ${{ needs.break-glass.outputs.request_delivered }}
+          BREAK_GLASS_GATE_DIGEST: ${{ needs.break-glass.outputs.gate_digest }}
 
         run: |
           set -euo pipefail
 
-          echo "source-security: result=$RESULT verdict=${VERDICT:-unknown} trusted=${TRUSTED:-unknown}"
+          echo "source-security:"
+          echo "  result=${SOURCE_RESULT:-unknown}"
+          echo "  verdict=${SOURCE_VERDICT:-unknown}"
+          echo "  trusted=${SOURCE_INTEGRITY_TRUSTED:-unknown}"
+          echo "  eligible=${SOURCE_BREAK_GLASS_ELIGIBLE:-unknown}"
+          echo "  delegated=${SOURCE_BREAK_GLASS_DELEGATED:-unknown}"
 
+          echo "break-glass:"
+          echo "  result=${BREAK_GLASS_RESULT:-unknown}"
+          echo "  decision=${BREAK_GLASS_DECISION:-unknown}"
+          echo "  delivered=${BREAK_GLASS_REQUEST_DELIVERED:-unknown}"
 
-          if [ "$MODE" = "log-only" ]; then
-            # Verdict-specific: only a BLOCK is suppressed by log-only. A PASS has
-            # nothing to suppress, but log-only stays visible as a rollout mode.
-            case "$VERDICT" in
-              BLOCK)
-                echo "::warning::GREEN BY CONFIGURATION, not by verdict — source verdict BLOCK is reported but NOT enforced because gate_mode is log-only."
-                ;;
-              PASS|PASS-WITH-EXCEPTIONS)
-                echo "::warning::Source verdict $VERDICT. gate_mode is log-only; no blocking verdict exists, so nothing was suppressed. A future BLOCK would not fail this check until the repository moves to enforce."
-                ;;
-              *)
-                echo "::warning::Source verdict is unavailable ('${VERDICT}'), and gate_mode is log-only so nothing is enforced. Treat this run as UNKNOWN, not clean."
-                ;;
-            esac
-          fi
-
-          [ "$RESULT" = "success" ] || exit 1
+          node "$SSD_TOOLKIT/scripts/final-gate.mjs"
 
   conformance:
-    needs: source-security
+    needs:
+      - source-security
+      - break-glass
+      - security-gate
+
     if: ${{ always() }}
 
     uses: IamRitz/ssd-security-framework/.github/workflows/_conformance.yml@3bae4435bb8fb582eb857654b5b3ccee51350905
@@ -119,11 +164,40 @@ jobs:
       artifact_type: library
       registry: none
       deploy_target: none
+
       break_glass_enabled: true
       strict_break_glass_evidence: true
 
       observed: >-
-        {"secret-scan":{"status":"${{ needs.source-security.outputs.secret_scan_result }}","evidence":"Secret scanning job (per-control output)"},
-         "dependency-scan":{"status":"${{ needs.source-security.outputs.dependency_scan_result }}","evidence":"Dependency scanning job (per-control output)"},
-         "sast":{"status":"${{ needs.source-security.outputs.sast_result }}","evidence":"SAST job (per-control output)"},
-         "source-gate":{"status":"${{ needs.source-security.outputs.source_gate_result }}","verdict":"${{ needs.source-security.outputs.verdict }}","gate_mode":"${{ needs.source-security.outputs.gate_mode }}","integrity_trusted":"${{ needs.source-security.outputs.integrity_trusted }}","evidence":"source-gate job"}}
+        {
+          "secret-scan":{
+            "status":"${{ needs.source-security.outputs.secret_scan_result }}",
+            "evidence":"Secret scanning job (per-control output)"
+          },
+          "dependency-scan":{
+            "status":"${{ needs.source-security.outputs.dependency_scan_result }}",
+            "evidence":"Dependency scanning job (per-control output)"
+          },
+          "sast":{
+            "status":"${{ needs.source-security.outputs.sast_result }}",
+            "evidence":"SAST job (per-control output)"
+          },
+          "source-gate":{
+            "status":"${{ needs.source-security.outputs.source_gate_result }}",
+            "verdict":"${{ needs.source-security.outputs.verdict }}",
+            "gate_mode":"${{ needs.source-security.outputs.gate_mode }}",
+            "integrity_trusted":"${{ needs.source-security.outputs.integrity_trusted }}",
+            "break_glass_eligible":"${{ needs.source-security.outputs.break_glass_eligible }}",
+            "gate_digest":"${{ needs.source-security.outputs.gate_digest }}",
+            "override":"${{ needs.security-gate.outputs.source_override }}",
+            "evidence":"source-gate job; override claim from final security-gate"
+          },
+          "break-glass":{
+            "status":"${{ needs.break-glass.result }}",
+            "decision":"${{ needs.break-glass.outputs.decision_status }}",
+            "request_delivered":"${{ needs.break-glass.outputs.request_delivered }}",
+            "gate_digest":"${{ needs.break-glass.outputs.gate_digest }}",
+            "delegated":"${{ needs.source-security.outputs.break_glass_delegated }}",
+            "evidence":"_break-glass-lambda.yml synthetic approval"
+          }
+        }
