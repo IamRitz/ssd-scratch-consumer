@@ -1,0 +1,114 @@
+name: Security - no break-glass OIDC proof
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-security:
+    uses: IamRitz/ssd-security-framework/.github/workflows/_source-scan.yml@3bae4435bb8fb582eb857654b5b3ccee51350905
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    with:
+      toolkit_ref: 3bae4435bb8fb582eb857654b5b3ccee51350905
+
+      gate_mode: enforce
+
+      semgrep_configs: |
+        p/owasp-top-ten
+        p/python
+
+      semgrep_paths: src
+
+      break_glass_enabled: false
+
+  security-gate:
+    name: security-gate
+    needs:
+      - source-security
+
+    if: ${{ always() }}
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Require source security
+        env:
+          RESULT: ${{ needs.source-security.result }}
+          VERDICT: ${{ needs.source-security.outputs.verdict }}
+          MODE: ${{ needs.source-security.outputs.gate_mode }}
+          TRUSTED: ${{ needs.source-security.outputs.integrity_trusted }}
+
+        run: |
+          set -euo pipefail
+
+          echo "source-security: result=$RESULT verdict=${VERDICT:-unknown} trusted=${TRUSTED:-unknown}"
+
+          if [ "$MODE" = "log-only" ]; then
+            case "$VERDICT" in
+              BLOCK)
+                echo "::warning::GREEN BY CONFIGURATION, not by verdict — source verdict BLOCK is reported but NOT enforced because gate_mode is log-only."
+                ;;
+              PASS|PASS-WITH-EXCEPTIONS)
+                echo "::warning::Source verdict $VERDICT. gate_mode is log-only; no blocking verdict exists, so nothing was suppressed."
+                ;;
+              *)
+                echo "::warning::Source verdict unavailable; treat this run as UNKNOWN."
+                ;;
+            esac
+          fi
+
+          [ "$RESULT" = "success" ] || exit 1
+
+          echo "Source security passed without granting OIDC permission."
+
+  conformance:
+    needs:
+      - source-security
+
+    if: ${{ always() }}
+
+    uses: IamRitz/ssd-security-framework/.github/workflows/_conformance.yml@3bae4435bb8fb582eb857654b5b3ccee51350905
+
+    with:
+      toolkit_ref: 3bae4435bb8fb582eb857654b5b3ccee51350905
+
+      phase: pr
+
+      artifact_type: library
+      registry: none
+      deploy_target: none
+
+      break_glass_enabled: false
+      strict_break_glass_evidence: true
+
+      observed: >-
+        {
+          "secret-scan":{
+            "status":"${{ needs.source-security.outputs.secret_scan_result }}",
+            "evidence":"Secret scanning job (per-control output)"
+          },
+          "dependency-scan":{
+            "status":"${{ needs.source-security.outputs.dependency_scan_result }}",
+            "evidence":"Dependency scanning job (per-control output)"
+          },
+          "sast":{
+            "status":"${{ needs.source-security.outputs.sast_result }}",
+            "evidence":"SAST job (per-control output)"
+          },
+          "source-gate":{
+            "status":"${{ needs.source-security.outputs.source_gate_result }}",
+            "verdict":"${{ needs.source-security.outputs.verdict }}",
+            "gate_mode":"${{ needs.source-security.outputs.gate_mode }}",
+            "integrity_trusted":"${{ needs.source-security.outputs.integrity_trusted }}",
+            "evidence":"source-gate job"
+          }
+        }
