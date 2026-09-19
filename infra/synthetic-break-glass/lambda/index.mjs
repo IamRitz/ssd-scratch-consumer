@@ -136,7 +136,11 @@ export const handler = async (event) => {
       body: {
         requestId,
         gateDigest,
-        status: "pending"
+        status: "denied",
+        decidedAt: new Date().toISOString(),
+        approver: {
+          username: "synthetic-test-approver"
+        }
       }
     };
   }
