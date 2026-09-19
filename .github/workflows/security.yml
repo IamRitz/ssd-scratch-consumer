@@ -67,7 +67,7 @@ jobs:
       aws_region: us-east-1
 
       # Real synthetic test resources.
-      synthetic_lambda_function: ssd-break-glass-synthetic
+      synthetic_lambda_function: ssd-break-glass-not-authorized
       synthetic_lambda_role_arn: arn:aws:iam::157328692276:role/ssd-break-glass-synthetic-invoker
       synthetic_aws_region: us-east-1
 
