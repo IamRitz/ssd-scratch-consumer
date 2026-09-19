@@ -15,15 +15,14 @@ permissions:
 
 jobs:
   source-security:
-    uses: IamRitz/ssd-security-framework/.github/workflows/_source-security.yml@068303774554f189b7444a0d3c95c6aeb7798608
+    uses: IamRitz/ssd-security-framework/.github/workflows/_source-security.yml@3bae4435bb8fb582eb857654b5b3ccee51350905
 
     permissions:
       contents: read
       pull-requests: write
-      id-token: write
 
     with:
-      toolkit_ref: 068303774554f189b7444a0d3c95c6aeb7798608
+      toolkit_ref: 3bae4435bb8fb582eb857654b5b3ccee51350905
 
       # First onboarding run only.
       gate_mode: enforce
@@ -77,9 +76,10 @@ jobs:
     needs: source-security
     if: ${{ always() }}
 
-    uses: IamRitz/ssd-security-framework/.github/workflows/_conformance.yml@068303774554f189b7444a0d3c95c6aeb7798608
+    uses: IamRitz/ssd-security-framework/.github/workflows/_conformance.yml@3bae4435bb8fb582eb857654b5b3ccee51350905
+
     with:
-      toolkit_ref: 068303774554f189b7444a0d3c95c6aeb7798608
+      toolkit_ref: 3bae4435bb8fb582eb857654b5b3ccee51350905
 
       phase: pr
 
@@ -87,6 +87,7 @@ jobs:
       registry: none
       deploy_target: none
       break_glass_enabled: false
+      strict_break_glass_evidence: true
 
       observed: >-
         {"secret-scan":{"status":"${{ needs.source-security.outputs.secret_scan_result }}","evidence":"Secret scanning job (per-control output)"},
