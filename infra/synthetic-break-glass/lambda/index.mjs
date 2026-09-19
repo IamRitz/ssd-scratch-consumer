@@ -136,7 +136,7 @@ export const handler = async (event) => {
       body: {
         requestId,
         gateDigest,
-        status: "denied",
+        status: "approved",
         decidedAt: new Date().toISOString(),
         approver: {
           username: "synthetic-test-approver"

@@ -15,14 +15,14 @@ permissions:
 
 jobs:
   source-security:
-    uses: IamRitz/ssd-security-framework/.github/workflows/_source-scan.yml@3bae4435bb8fb582eb857654b5b3ccee51350905
+    uses: IamRitz/ssd-security-framework/.github/workflows/_source-scan.yml@158b3fbb69f68c8a1c6d26233acf833309d0ca2d
 
     permissions:
       contents: read
       pull-requests: write
 
     with:
-      toolkit_ref: 3bae4435bb8fb582eb857654b5b3ccee51350905
+      toolkit_ref: 158b3fbb69f68c8a1c6d26233acf833309d0ca2d
 
       gate_mode: enforce
 
@@ -47,14 +47,14 @@ jobs:
     # trusted, enforced BLOCK.
     if: ${{ always() && needs.source-security.outputs.break_glass_delegated == 'true' }}
 
-    uses: IamRitz/ssd-security-framework/.github/workflows/_break-glass-lambda.yml@3bae4435bb8fb582eb857654b5b3ccee51350905
+    uses: IamRitz/ssd-security-framework/.github/workflows/_break-glass-lambda.yml@158b3fbb69f68c8a1c6d26233acf833309d0ca2d
 
     permissions:
       contents: read
       id-token: write
 
     with:
-      toolkit_ref: 3bae4435bb8fb582eb857654b5b3ccee51350905
+      toolkit_ref: 158b3fbb69f68c8a1c6d26233acf833309d0ca2d
 
       gate_mode: ${{ needs.source-security.outputs.gate_mode }}
       expected_gate_digest: ${{ needs.source-security.outputs.gate_digest }}
@@ -154,10 +154,10 @@ jobs:
 
     if: ${{ always() }}
 
-    uses: IamRitz/ssd-security-framework/.github/workflows/_conformance.yml@3bae4435bb8fb582eb857654b5b3ccee51350905
+    uses: IamRitz/ssd-security-framework/.github/workflows/_conformance.yml@158b3fbb69f68c8a1c6d26233acf833309d0ca2d
 
     with:
-      toolkit_ref: 3bae4435bb8fb582eb857654b5b3ccee51350905
+      toolkit_ref: 158b3fbb69f68c8a1c6d26233acf833309d0ca2d
 
       phase: pr
 
