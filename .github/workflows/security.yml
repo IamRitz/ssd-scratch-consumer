@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   source-security:
-    uses: IamRitz/ssd-security-framework/.github/workflows/_source-security.yml@3bae4435bb8fb582eb857654b5b3ccee51350905
+    uses: IamRitz/ssd-security-framework/.github/workflows/_source-scan.yml@3bae4435bb8fb582eb857654b5b3ccee51350905
 
     permissions:
       contents: read
