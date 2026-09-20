@@ -15,14 +15,14 @@ permissions:
 
 jobs:
   source-security:
-    uses: IamRitz/ssd-security-framework/.github/workflows/_source-scan.yml@158b3fbb69f68c8a1c6d26233acf833309d0ca2d
+    uses: IamRitz/ssd-security-framework/.github/workflows/_source-scan.yml@6d8303f87998179e6f67c05c120d69434e428cd7
 
     permissions:
       contents: read
       pull-requests: write
 
     with:
-      toolkit_ref: 158b3fbb69f68c8a1c6d26233acf833309d0ca2d
+      toolkit_ref: 6d8303f87998179e6f67c05c120d69434e428cd7
 
       gate_mode: enforce
 
@@ -47,14 +47,14 @@ jobs:
     # trusted, enforced BLOCK.
     if: ${{ always() && needs.source-security.outputs.break_glass_delegated == 'true' }}
 
-    uses: IamRitz/ssd-security-framework/.github/workflows/_break-glass-lambda.yml@158b3fbb69f68c8a1c6d26233acf833309d0ca2d
+    uses: IamRitz/ssd-security-framework/.github/workflows/_break-glass-lambda.yml@6d8303f87998179e6f67c05c120d69434e428cd7
 
     permissions:
       contents: read
       id-token: write
 
     with:
-      toolkit_ref: 158b3fbb69f68c8a1c6d26233acf833309d0ca2d
+      toolkit_ref: 6d8303f87998179e6f67c05c120d69434e428cd7
 
       gate_mode: ${{ needs.source-security.outputs.gate_mode }}
       expected_gate_digest: ${{ needs.source-security.outputs.gate_digest }}
@@ -96,7 +96,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: IamRitz/ssd-security-framework
-          ref: 158b3fbb69f68c8a1c6d26233acf833309d0ca2d 
+          ref: 6d8303f87998179e6f67c05c120d69434e428cd7 
           path: .ssd-toolkit
           persist-credentials: false
 
@@ -154,10 +154,10 @@ jobs:
 
     if: ${{ always() }}
 
-    uses: IamRitz/ssd-security-framework/.github/workflows/_conformance.yml@158b3fbb69f68c8a1c6d26233acf833309d0ca2d
+    uses: IamRitz/ssd-security-framework/.github/workflows/_conformance.yml@6d8303f87998179e6f67c05c120d69434e428cd7
 
     with:
-      toolkit_ref: 158b3fbb69f68c8a1c6d26233acf833309d0ca2d
+      toolkit_ref: 6d8303f87998179e6f67c05c120d69434e428cd7
 
       phase: pr
 
