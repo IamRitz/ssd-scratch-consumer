@@ -127,7 +127,7 @@ export const handler = async (event) => {
         event: "synthetic-break-glass-status",
         requestId,
         gateDigest,
-        decision: "pending"
+        decision: "approved"
       })
     );
 
@@ -136,7 +136,11 @@ export const handler = async (event) => {
       body: {
         requestId,
         gateDigest,
-        status: "pending"
+        status: "approved",
+        decidedAt: new Date().toISOString(),
+        approver: {
+          username: "synthetic-test-approver"
+        }
       }
     };
   }
