@@ -1,0 +1,66 @@
+# ssd-onboard configuration — consumer-owned and NON-SECRET.
+#
+# Every generated security/delivery workflow is rendered from this file:
+#   ssd-onboard validate        check it against the repository
+#   ssd-onboard render          regenerate the workflows and scanner configs
+#   ssd-onboard render --check  fail if generated files have drifted
+#
+# Identifiers only: ARNs, resource names, GitHub secret NAMES. Never put a
+# credential here (access keys, tokens, webhook URLs, signing secrets); the tool
+# refuses to read or write one. ssd-onboard rewrites this file canonically, so
+# record rationale in commit messages and pull requests, not comments here.
+
+schemaVersion: '1'
+
+repository:
+  slug: IamRitz/ssd-scratch-consumer
+  defaultBranch: main
+
+# Exact framework ref: every generated `uses:` line and toolkit_ref use this value.
+framework:
+  repository: IamRitz/ssd-security-framework
+  ref: 378c94f20a1c264e1a319c5da37b83d3730ede74
+
+# source-only | container-self-managed | container-ecr-framework-gated
+profile: source-only
+
+workflows:
+  security: .github/workflows/security.yml
+
+# log-only -> enforce only via `ssd-onboard promote --enforce`.
+rollout:
+  gateMode: log-only
+  schedule: '0 6 * * 1'
+
+# roots: `.` is the whole repository. Narrowing puts everything else outside SAST.
+# ignore: rendered as .semgrepignore, which REPLACES Semgrep's built-in ignore list
+# (that list silently skips tests/, test/, build/, vendor/, node_modules/).
+semgrep:
+  rulesets:
+    - p/owasp-top-ten
+    - p/javascript
+  roots:
+    - .
+  ignore:
+    managed: true
+    patterns: []
+  baseline:
+    path: security/baseline/semgrep-baseline.json
+    state: absent
+
+# default: no file (full default ruleset). managed: generated with [extend] useDefault = true.
+gitleaks:
+  mode: default
+
+# Empty = no path exclusions.
+trufflehog: {}
+
+# Slack webhook: only the GitHub SECRET NAME is recorded; the URL is a credential.
+notifications:
+  slack:
+    enabled: false
+    githubSecretName: SECURITY_NOTIFY_SLACK_URL
+
+# Only `disabled` is supported by Phase 1 (see docs/onboarding-cli.md).
+breakGlass:
+  mode: disabled
