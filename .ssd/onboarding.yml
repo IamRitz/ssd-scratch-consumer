@@ -29,7 +29,7 @@ workflows:
 
 # log-only -> enforce only via `ssd-onboard promote --enforce`.
 rollout:
-  gateMode: log-only
+  gateMode: enforce
   schedule: '0 6 * * 1'
 
 # roots: `.` is the whole repository. Narrowing puts everything else outside SAST.
