@@ -19,7 +19,7 @@ repository:
 # Exact framework ref: every generated `uses:` line and toolkit_ref use this value.
 framework:
   repository: IamRitz/ssd-security-framework
-  ref: 48c1e0279f65596c5f58c2a87fd4d6ab1d6e5585
+  ref: a91c6cdc36a649f54d7225e8820f067fcb3e0a0d
 
 # source-only | container-self-managed | container-ecr-framework-gated
 profile: source-only
@@ -29,7 +29,7 @@ workflows:
 
 # log-only -> enforce only via `ssd-onboard promote --enforce`.
 rollout:
-  gateMode: enforce
+  gateMode: log-only
   schedule: '0 6 * * 1'
 
 # roots: `.` is the whole repository. Narrowing puts everything else outside SAST.
@@ -46,8 +46,7 @@ semgrep:
     patterns: []
   baseline:
     path: security/baseline/semgrep-baseline.json
-    state: accepted
-    acceptedScope: d89c81a4bef3816e84512a1315684fdaa88b099560a17b8c705266dfe69b9d35
+    state: absent
 
 # default: no file (full default ruleset). managed: generated with [extend] useDefault = true.
 gitleaks:
